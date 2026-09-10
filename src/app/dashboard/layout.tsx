@@ -114,15 +114,6 @@ export default function DashboardLayout({
 						>
 							<Menu size={22} />
 						</button>
-						<div className="flex items-center gap-2 text-sm text-gray-400">
-							<span className="text-white font-medium">
-								Workspace
-							</span>
-							<span>/</span>
-							<span className="text-emerald-400 bg-emerald-950/50 px-2 py-0.5 rounded border border-emerald-900/50 text-xs">
-								PRODUCTION
-							</span>
-						</div>
 					</div>
 
 					{/* Elementos Derechos del Navbar (Buscador, Notificaciones y Perfil de Usuario) */}
