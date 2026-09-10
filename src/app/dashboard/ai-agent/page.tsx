@@ -1,164 +1,325 @@
 "use client";
 
-import React, { useState } from "react";
-import { CATEGORIAS_FINANZAS, Transaccion } from "@/lib/schemas/finanzas";
-import { Sparkles, ArrowRight, AlertTriangle } from "lucide-react";
+import React, { useRef, useState, useTransition } from "react";
+import {
+	ArrowUp,
+	Bot,
+	Loader2,
+	Sparkles,
+	User,
+	Wallet,
+	AlertCircle,
+} from "lucide-react";
+import {
+	processFinancialPrompt,
+	type ProcessedTransaction,
+} from "@/app/actions/agent";
 
-export default function Home() {
+type ChatEntry =
+	| { id: string; role: "user"; text: string }
+	| {
+			id: string;
+			role: "assistant";
+			text: string;
+			transaction?: ProcessedTransaction;
+			error?: string;
+	  };
+
+const EXAMPLES = [
+	"Gasté $350 en gasolina con mi tarjeta BBVA",
+	"Me depositaron $15,000 de nómina en BBVA Nómina",
+	"Pagué $620 de luz con Efectivo",
+];
+
+const TYPE_LABEL: Record<ProcessedTransaction["type"], string> = {
+	expense: "Gasto",
+	income: "Ingreso",
+	transfer: "Transferencia",
+};
+
+function formatMoney(value: number) {
+	return new Intl.NumberFormat("es-MX", {
+		style: "currency",
+		currency: "MXN",
+	}).format(value);
+}
+
+function formatDate(iso: string) {
+	const date = new Date(iso);
+	if (Number.isNaN(date.getTime())) return iso;
+	return date.toLocaleDateString("es-MX", {
+		day: "2-digit",
+		month: "short",
+		year: "numeric",
+	});
+}
+
+export default function AIAgentPage() {
 	const [prompt, setPrompt] = useState("");
-	const [loading, setLoading] = useState(false);
-	const [transaccion, setTransaccion] = useState<Partial<Transaccion> | null>(
-		null,
-	);
-	const [rawText, setRawText] = useState("");
+	const [history, setHistory] = useState<ChatEntry[]>([]);
+	const [isPending, startTransition] = useTransition();
+	const listRef = useRef<HTMLDivElement>(null);
 
-	const handleSubmit = async (e: React.FormEvent) => {
-		e.preventDefault();
-		if (!prompt.trim()) return;
-
-		setLoading(true);
-		setTransaccion(null);
-		setRawText("");
-
-		try {
-			const response = await fetch("/api/transacciones/parse", {
-				method: "POST",
-				headers: { "Content-Type": "application/json" },
-				body: JSON.stringify({ prompt }),
+	const scrollToBottom = () => {
+		requestAnimationFrame(() => {
+			listRef.current?.scrollTo({
+				top: listRef.current.scrollHeight,
+				behavior: "smooth",
 			});
+		});
+	};
 
-			if (!response.ok || !response.body) {
-				throw new Error("Error al procesar la transacción");
+	const submitPrompt = (text: string) => {
+		const message = text.trim();
+		if (!message || isPending) return;
+
+		const userId = crypto.randomUUID();
+		setHistory((prev) => [
+			...prev,
+			{ id: userId, role: "user", text: message },
+		]);
+		setPrompt("");
+		scrollToBottom();
+
+		startTransition(async () => {
+			const result = await processFinancialPrompt(message);
+
+			if (result.success) {
+				setHistory((prev) => [
+					...prev,
+					{
+						id: crypto.randomUUID(),
+						role: "assistant",
+						text: "Transacción registrada y saldo actualizado.",
+						transaction: result.transaction,
+					},
+				]);
+			} else {
+				setHistory((prev) => [
+					...prev,
+					{
+						id: crypto.randomUUID(),
+						role: "assistant",
+						text: result.error,
+						error: result.error,
+					},
+				]);
 			}
+			scrollToBottom();
+		});
+	};
 
-			const reader = response.body.getReader();
-			const decoder = new TextDecoder();
-			let accumulatedText = "";
-
-			while (true) {
-				const { done, value } = await reader.read();
-				if (done) break;
-
-				const chunk = decoder.decode(value, { stream: true });
-				accumulatedText += chunk;
-				setRawText(accumulatedText);
-
-				try {
-					const parsed = JSON.parse(accumulatedText);
-					setTransaccion(parsed);
-				} catch {
-					// El JSON aún está incompleto por el streaming
-				}
-			}
-		} catch (error) {
-			console.error(error);
-		} finally {
-			setLoading(false);
-		}
+	const handleSubmit = (e: React.FormEvent) => {
+		e.preventDefault();
+		submitPrompt(prompt);
 	};
 
 	return (
-		<div className="max-w-4xl mx-auto space-y-8">
-			{/* Encabezado */}
-			<div className="bg-[#17171a] border border-gray-800 rounded-xl p-6 shadow-sm flex items-center justify-between">
+		<div className="max-w-4xl mx-auto h-[calc(100vh-8.5rem)] flex flex-col gap-5">
+			<div className="bg-[#17171a] border border-gray-800 rounded-xl p-6 shadow-sm flex items-center justify-between shrink-0">
 				<div className="flex items-center gap-4">
 					<div className="p-3 bg-emerald-950/50 text-emerald-400 rounded-xl border border-emerald-900/50">
 						<Sparkles size={24} />
 					</div>
 					<div>
 						<h1 className="text-xl font-bold text-white tracking-tight">
-							Agente de Finanzas con IA
+							Agente IA
 						</h1>
 						<p className="text-xs text-gray-400 mt-0.5">
-							Escribe tu gasto o ingreso en lenguaje natural y la
-							IA lo estructurará automáticamente.
+							Describe un gasto o ingreso en lenguaje natural. Lo
+							convertimos en una transacción y actualizamos el
+							saldo de la cuenta.
 						</p>
 					</div>
 				</div>
 			</div>
 
-			{/* Formulario y Tarjeta de Resultado */}
-			<div className="bg-[#17171a] border border-gray-800 rounded-xl p-6 shadow-sm space-y-6">
-				<form onSubmit={handleSubmit} className="space-y-4">
-					<div>
-						<label className="block text-xs font-medium text-gray-400 mb-2">
-							Descripción de la transacción
-						</label>
+			<div className="flex-1 min-h-0 bg-[#17171a] border border-gray-800 rounded-xl shadow-sm flex flex-col overflow-hidden">
+				<div
+					ref={listRef}
+					className="flex-1 overflow-y-auto p-5 space-y-4"
+				>
+					{history.length === 0 && (
+						<div className="h-full flex flex-col items-center justify-center text-center px-6">
+							<div className="p-3 bg-emerald-950/40 text-emerald-400 rounded-xl border border-emerald-900/40 mb-4">
+								<Bot size={28} />
+							</div>
+							<p className="text-sm text-white font-medium">
+								Consola del agente
+							</p>
+							<p className="text-xs text-gray-400 mt-1 max-w-md">
+								Ejemplo: “Gasté $350 en gasolina con mi tarjeta
+								BBVA”. El modelo extrae monto, categoría y
+								cuenta, y guarda el movimiento.
+							</p>
+							<div className="flex flex-wrap justify-center gap-2 mt-5">
+								{EXAMPLES.map((example) => (
+									<button
+										key={example}
+										type="button"
+										onClick={() => submitPrompt(example)}
+										disabled={isPending}
+										className="text-[11px] text-gray-300 bg-[#1f1f23] border border-gray-800 hover:border-emerald-700/60 hover:text-emerald-400 rounded-lg px-3 py-2 transition disabled:opacity-50"
+									>
+										{example}
+									</button>
+								))}
+							</div>
+						</div>
+					)}
+
+					{history.map((entry) =>
+						entry.role === "user" ? (
+							<div key={entry.id} className="flex justify-end gap-2">
+								<div className="max-w-[85%] bg-[#1f1f23] border border-gray-800 rounded-xl px-4 py-3">
+									<p className="text-sm text-white whitespace-pre-wrap">
+										{entry.text}
+									</p>
+								</div>
+								<div className="h-8 w-8 rounded-lg bg-[#27272a] border border-gray-800 flex items-center justify-center text-gray-300 shrink-0">
+									<User size={14} />
+								</div>
+							</div>
+						) : (
+							<div key={entry.id} className="flex justify-start gap-2">
+								<div className="h-8 w-8 rounded-lg bg-emerald-950/50 border border-emerald-900/50 flex items-center justify-center text-emerald-400 shrink-0">
+									<Bot size={14} />
+								</div>
+								<div className="max-w-[90%] space-y-3">
+									<p
+										className={`text-sm ${entry.error ? "text-red-300" : "text-gray-200"}`}
+									>
+										{entry.error && (
+											<AlertCircle
+												size={14}
+												className="inline mr-1.5 -mt-0.5"
+											/>
+										)}
+										{entry.text}
+									</p>
+									{entry.transaction && (
+										<TransactionCard
+											tx={entry.transaction}
+										/>
+									)}
+								</div>
+							</div>
+						),
+					)}
+
+					{isPending && (
+						<div className="flex items-center gap-2 text-emerald-400 text-xs">
+							<Loader2 size={14} className="animate-spin" />
+							Analizando el mensaje y registrando la
+							transacción…
+						</div>
+					)}
+				</div>
+
+				<form
+					onSubmit={handleSubmit}
+					className="border-t border-gray-800 p-4 bg-[#141416]"
+				>
+					<div className="flex items-end gap-2">
 						<textarea
 							value={prompt}
 							onChange={(e) => setPrompt(e.target.value)}
-							placeholder="Ej. Compré despensa en el Walmart por 1,250 pesos con tarjeta de crédito..."
-							rows={3}
-							className="w-full rounded-xl bg-[#1f1f23] border border-gray-800 p-4 text-white placeholder:text-zinc-600 focus:outline-none focus:border-emerald-500 text-sm"
+							onKeyDown={(e) => {
+								if (e.key === "Enter" && !e.shiftKey) {
+									e.preventDefault();
+									submitPrompt(prompt);
+								}
+							}}
+							placeholder="Escribe un gasto o ingreso…"
+							rows={2}
+							disabled={isPending}
+							className="flex-1 resize-none rounded-xl bg-[#1f1f23] border border-gray-800 p-3 text-sm text-white placeholder:text-zinc-600 focus:outline-none focus:border-emerald-500 disabled:opacity-60"
 						/>
+						<button
+							type="submit"
+							disabled={isPending || !prompt.trim()}
+							className="h-11 w-11 shrink-0 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-black disabled:opacity-40 flex items-center justify-center transition"
+							aria-label="Enviar"
+						>
+							{isPending ? (
+								<Loader2 size={18} className="animate-spin" />
+							) : (
+								<ArrowUp size={18} />
+							)}
+						</button>
 					</div>
-					<button
-						type="submit"
-						disabled={loading}
-						className="w-full py-2.5 px-4 bg-emerald-600 hover:bg-emerald-500 text-black disabled:opacity-50 font-medium rounded-xl transition-colors cursor-pointer text-sm flex items-center justify-center gap-2 shadow-sm"
-					>
-						{loading ? (
-							"Analizando transacción..."
-						) : (
-							<>
-								Procesar con IA <ArrowRight size={16} />
-							</>
-						)}
-					</button>
 				</form>
+			</div>
+		</div>
+	);
+}
 
-				{/* Tarjeta de resultado estructurado */}
-				{(transaccion || rawText) && (
-					<div className="rounded-xl bg-[#141416] border border-gray-800 p-5 space-y-4 animate-in fade-in duration-200">
-						<h2 className="text-xs font-semibold uppercase tracking-wider text-emerald-400">
-							Resultado Extraído
-						</h2>
+function TransactionCard({ tx }: { tx: ProcessedTransaction }) {
+	const isIncome = tx.type === "income";
 
-						<div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
-							<div className="bg-[#1f1f23] p-3 rounded-lg border border-gray-800">
-								<span className="text-gray-400 block text-[11px]">
-									Comercio
-								</span>
-								<span className="font-medium text-white">
-									{transaccion?.comercio || "Analizando..."}
-								</span>
-							</div>
-							<div className="bg-[#1f1f23] p-3 rounded-lg border border-gray-800">
-								<span className="text-gray-400 block text-[11px]">
-									Monto
-								</span>
-								<span className="font-medium text-white">
-									{transaccion?.monto
-										? `$${transaccion.monto}`
-										: "---"}
-								</span>
-							</div>
-							<div className="bg-[#1f1f23] p-3 rounded-lg border border-gray-800">
-								<span className="text-gray-400 block text-[11px]">
-									Categoría
-								</span>
-								<span className="font-medium text-white">
-									{transaccion?.categoria || "---"}
-								</span>
-							</div>
-							<div className="bg-[#1f1f23] p-3 rounded-lg border border-gray-800">
-								<span className="text-gray-400 block text-[11px]">
-									Tipo
-								</span>
-								<span className="capitalize font-medium text-white">
-									{transaccion?.tipo || "---"}
-								</span>
-							</div>
+	return (
+		<div className="rounded-xl bg-[#141416] border border-gray-800 p-4 space-y-3">
+			<div className="flex items-center justify-between">
+				<span className="text-[11px] font-semibold uppercase tracking-wider text-emerald-400">
+					Transacción procesada
+				</span>
+				<span
+					className={`text-[11px] font-medium px-2 py-0.5 rounded-md border ${
+						isIncome
+							? "text-emerald-400 bg-emerald-950/40 border-emerald-900/50"
+							: "text-red-300 bg-red-950/30 border-red-900/40"
+					}`}
+				>
+					{TYPE_LABEL[tx.type]}
+				</span>
+			</div>
+			<div className="grid grid-cols-2 gap-2 text-xs">
+				<div className="bg-[#1f1f23] border border-gray-800 rounded-lg p-2.5">
+					<span className="text-gray-500 block text-[10px]">
+						Descripción
+					</span>
+					<span className="text-white font-medium">
+						{tx.description}
+					</span>
+				</div>
+				<div className="bg-[#1f1f23] border border-gray-800 rounded-lg p-2.5">
+					<span className="text-gray-500 block text-[10px]">
+						Monto
+					</span>
+					<span
+						className={`font-medium ${isIncome ? "text-emerald-400" : "text-white"}`}
+					>
+						{isIncome ? "+" : "-"}
+						{formatMoney(tx.amount)}
+					</span>
+				</div>
+				<div className="bg-[#1f1f23] border border-gray-800 rounded-lg p-2.5">
+					<span className="text-gray-500 block text-[10px]">
+						Categoría
+					</span>
+					<span className="text-white font-medium">
+						{tx.category}
+					</span>
+				</div>
+				<div className="bg-[#1f1f23] border border-gray-800 rounded-lg p-2.5">
+					<span className="text-gray-500 block text-[10px]">
+						Fecha
+					</span>
+					<span className="text-white font-medium">
+						{formatDate(tx.date)}
+					</span>
+				</div>
+				<div className="bg-[#1f1f23] border border-gray-800 rounded-lg p-2.5 col-span-2">
+					<div className="flex items-center justify-between">
+						<div className="flex items-center gap-2 text-gray-400">
+							<Wallet size={14} className="text-emerald-400" />
+							<span>{tx.accountName}</span>
 						</div>
-
-						{transaccion?.alertaPresupuesto && (
-							<div className="bg-amber-950/30 border border-amber-900/50 p-3 rounded-lg text-amber-300 text-xs flex items-center gap-2">
-								<AlertTriangle size={16} />
-								<span>{transaccion.alertaPresupuesto}</span>
-							</div>
-						)}
+						<span className="text-white font-medium">
+							Saldo {formatMoney(tx.accountBalance)}
+						</span>
 					</div>
-				)}
+				</div>
 			</div>
 		</div>
 	);
