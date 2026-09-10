@@ -1,0 +1,62 @@
+generator client {
+    provider = "prisma-client-js"
+}
+
+datasource db {
+    provider = "postgresql"
+}
+
+enum AccountType {
+    debit_card
+    credit_card
+    cash
+    savings
+}
+
+enum TransactionType {
+    gasto
+    ingreso
+}
+
+model FinancialAccount {
+    id             String      @id @default(uuid())
+    name           String
+    type           AccountType
+    balance        Decimal     @default(0.0)
+    creditLimit    Decimal?    @default(0.0)
+    cutoffDay      Int?
+    paymentDueDate Int?
+    currency       String      @default("MXN")
+
+    transactions Transaction[]
+    createdAt    DateTime      @default(now())
+    updatedAt    DateTime      @updatedAt
+
+    @@map("financial_accounts")
+}
+
+model Transaction {
+    id                String          @id @default(uuid())
+    comercio          String
+    monto             Decimal
+    categoria         String
+    tipo              TransactionType
+    alertaPresupuesto String?
+
+    accountId String
+    account   FinancialAccount @relation(fields: [accountId], references: [id], onDelete: Cascade)
+
+    createdAt DateTime @default(now())
+
+    @@map("transactions")
+}
+
+model Budget {
+    id        String   @id @default(uuid())
+    categoria String   @unique
+    limite    Decimal
+    createdAt DateTime @default(now())
+    updatedAt DateTime @updatedAt
+
+    @@map("budgets")
+}

@@ -1,9 +1,9 @@
 "use client";
 
-import React, { useState } from "react";
-import { useAccounts } from "@/context/AccountContext";
-import { AccountType, FinancialAccount } from "@/types/finance";
-import { X } from "lucide-react";
+import React, { useState, useTransition } from "react";
+import { X, Loader2 } from "lucide-react";
+import { createAccountAction } from "@/app/actions/accounts";
+import { AccountType } from "@prisma/client";
 
 interface AccountModalProps {
 	isOpen: boolean;
@@ -11,10 +11,10 @@ interface AccountModalProps {
 }
 
 export const AccountModal = ({ isOpen, onClose }: AccountModalProps) => {
-	const { addOrUpdateAccount } = useAccounts();
+	const [isPending, startTransition] = useTransition();
 
 	const [name, setName] = useState("");
-	const [type, setType] = useState<AccountType>("debit_card");
+	const [type, setType] = useState<AccountType>(AccountType.debit_card);
 	const [balance, setBalance] = useState("");
 	const [creditLimit, setCreditLimit] = useState("");
 	const [cutoffDay, setCutoffDay] = useState("");
@@ -27,44 +27,36 @@ export const AccountModal = ({ isOpen, onClose }: AccountModalProps) => {
 		e.preventDefault();
 		if (!name.trim()) return;
 
-		const newAccount: FinancialAccount = {
-			id: Date.now().toString(),
-			name,
-			type,
-			currency,
-			balance: type !== "credit_card" ? parseFloat(balance) || 0 : 0,
-			creditLimit:
-				type === "credit_card"
-					? parseFloat(creditLimit) || 0
-					: undefined,
-			cutoffDay:
-				type === "credit_card"
-					? parseInt(cutoffDay) || undefined
-					: undefined,
-			paymentDueDate:
-				type === "credit_card"
-					? parseInt(paymentDueDate) || undefined
-					: undefined,
-		};
+		startTransition(async () => {
+			await createAccountAction({
+				name,
+				type,
+				currency,
+				balance: parseFloat(balance) || 0,
+				creditLimit: parseFloat(creditLimit) || undefined,
+				cutoffDay: parseInt(cutoffDay) || undefined,
+				paymentDueDate: parseInt(paymentDueDate) || undefined,
+			});
 
-		addOrUpdateAccount(newAccount);
-		onClose();
-		// Limpiar formulario
-		setName("");
-		setBalance("");
-		setCreditLimit("");
-		setCutoffDay("");
-		setPaymentDueDate("");
+			// Reset de campos y cierre del modal
+			setName("");
+			setBalance("");
+			setCreditLimit("");
+			setCutoffDay("");
+			setPaymentDueDate("");
+			onClose();
+		});
 	};
 
-	const isCredit = type === "credit_card";
+	const isCredit = type === AccountType.credit_card;
 
 	return (
 		<div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex justify-center items-center z-50 p-4">
 			<div className="bg-[#17171a] border border-gray-800 rounded-2xl max-w-md w-full p-6 shadow-2xl relative animate-in fade-in zoom-in duration-200">
 				<button
 					onClick={onClose}
-					className="absolute top-4 right-4 text-gray-400 hover:text-white transition"
+					disabled={isPending}
+					className="absolute top-4 right-4 text-gray-400 hover:text-white transition disabled:opacity-50"
 				>
 					<X size={20} />
 				</button>
@@ -84,7 +76,8 @@ export const AccountModal = ({ isOpen, onClose }: AccountModalProps) => {
 							placeholder="Ej. BBVA Nómina o Tarjeta Visa"
 							value={name}
 							onChange={(e) => setName(e.target.value)}
-							className="w-full px-3 py-2 bg-[#1f1f23] border border-gray-800 rounded-lg focus:outline-none focus:border-emerald-500 text-white text-sm"
+							disabled={isPending}
+							className="w-full px-3 py-2 bg-[#1f1f23] border border-gray-800 rounded-lg focus:outline-none focus:border-emerald-500 text-white text-sm disabled:opacity-50"
 						/>
 					</div>
 
@@ -97,16 +90,19 @@ export const AccountModal = ({ isOpen, onClose }: AccountModalProps) => {
 							onChange={(e) =>
 								setType(e.target.value as AccountType)
 							}
-							className="w-full px-3 py-2 bg-[#1f1f23] border border-gray-800 rounded-lg focus:outline-none focus:border-emerald-500 text-white text-sm"
+							disabled={isPending}
+							className="w-full px-3 py-2 bg-[#1f1f23] border border-gray-800 rounded-lg focus:outline-none focus:border-emerald-500 text-white text-sm disabled:opacity-50"
 						>
-							<option value="debit_card">
+							<option value={AccountType.debit_card}>
 								Tarjeta de Débito
 							</option>
-							<option value="credit_card">
+							<option value={AccountType.credit_card}>
 								Tarjeta de Crédito
 							</option>
-							<option value="cash">Efectivo</option>
-							<option value="savings">Cuenta de Ahorro</option>
+							<option value={AccountType.cash}>Efectivo</option>
+							<option value={AccountType.savings}>
+								Cuenta de Ahorro
+							</option>
 						</select>
 					</div>
 
@@ -118,7 +114,8 @@ export const AccountModal = ({ isOpen, onClose }: AccountModalProps) => {
 							<select
 								value={currency}
 								onChange={(e) => setCurrency(e.target.value)}
-								className="w-full px-3 py-2 bg-[#1f1f23] border border-gray-800 rounded-lg focus:outline-none focus:border-emerald-500 text-white text-sm"
+								disabled={isPending}
+								className="w-full px-3 py-2 bg-[#1f1f23] border border-gray-800 rounded-lg focus:outline-none focus:border-emerald-500 text-white text-sm disabled:opacity-50"
 							>
 								<option value="MXN">MXN ($)</option>
 								<option value="USD">USD ($)</option>
@@ -137,7 +134,8 @@ export const AccountModal = ({ isOpen, onClose }: AccountModalProps) => {
 									placeholder="0.00"
 									value={balance}
 									onChange={(e) => setBalance(e.target.value)}
-									className="w-full px-3 py-2 bg-[#1f1f23] border border-gray-800 rounded-lg focus:outline-none focus:border-emerald-500 text-white text-sm"
+									disabled={isPending}
+									className="w-full px-3 py-2 bg-[#1f1f23] border border-gray-800 rounded-lg focus:outline-none focus:border-emerald-500 text-white text-sm disabled:opacity-50"
 								/>
 							</div>
 						) : (
@@ -153,7 +151,8 @@ export const AccountModal = ({ isOpen, onClose }: AccountModalProps) => {
 									onChange={(e) =>
 										setCreditLimit(e.target.value)
 									}
-									className="w-full px-3 py-2 bg-[#1f1f23] border border-gray-800 rounded-lg focus:outline-none focus:border-emerald-500 text-white text-sm"
+									disabled={isPending}
+									className="w-full px-3 py-2 bg-[#1f1f23] border border-gray-800 rounded-lg focus:outline-none focus:border-emerald-500 text-white text-sm disabled:opacity-50"
 								/>
 							</div>
 						)}
@@ -174,7 +173,8 @@ export const AccountModal = ({ isOpen, onClose }: AccountModalProps) => {
 									onChange={(e) =>
 										setCutoffDay(e.target.value)
 									}
-									className="w-full px-3 py-1.5 bg-[#1f1f23] border border-gray-800 rounded-lg focus:outline-none focus:border-purple-500 text-white text-xs"
+									disabled={isPending}
+									className="w-full px-3 py-1.5 bg-[#1f1f23] border border-gray-800 rounded-lg focus:outline-none focus:border-purple-500 text-white text-xs disabled:opacity-50"
 								/>
 							</div>
 							<div>
@@ -190,7 +190,8 @@ export const AccountModal = ({ isOpen, onClose }: AccountModalProps) => {
 									onChange={(e) =>
 										setPaymentDueDate(e.target.value)
 									}
-									className="w-full px-3 py-1.5 bg-[#1f1f23] border border-gray-800 rounded-lg focus:outline-none focus:border-purple-500 text-white text-xs"
+									disabled={isPending}
+									className="w-full px-3 py-1.5 bg-[#1f1f23] border border-gray-800 rounded-lg focus:outline-none focus:border-purple-500 text-white text-xs disabled:opacity-50"
 								/>
 							</div>
 						</div>
@@ -200,14 +201,19 @@ export const AccountModal = ({ isOpen, onClose }: AccountModalProps) => {
 						<button
 							type="button"
 							onClick={onClose}
-							className="px-4 py-2 border border-gray-800 text-gray-300 rounded-lg hover:bg-[#1f1f23] transition text-xs font-medium"
+							disabled={isPending}
+							className="px-4 py-2 border border-gray-800 text-gray-300 rounded-lg hover:bg-[#1f1f23] transition text-xs font-medium disabled:opacity-50"
 						>
 							Cancelar
 						</button>
 						<button
 							type="submit"
-							className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-black rounded-lg transition text-xs font-medium shadow-sm"
+							disabled={isPending}
+							className="inline-flex items-center gap-2 px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-black rounded-lg transition text-xs font-medium shadow-sm disabled:opacity-50"
 						>
+							{isPending && (
+								<Loader2 size={14} className="animate-spin" />
+							)}
 							Guardar Cuenta
 						</button>
 					</div>

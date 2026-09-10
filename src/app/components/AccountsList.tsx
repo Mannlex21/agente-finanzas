@@ -1,32 +1,56 @@
 "use client";
 
-import React from "react";
-import { useAccounts } from "@/context/AccountContext";
+import React, { useTransition } from "react";
 import { Wallet, CreditCard, Trash2 } from "lucide-react";
+import { useRouter } from "next/navigation";
 
-export const AccountsList = ({ onOpenModal }: { onOpenModal: () => void }) => {
-	const { accounts, loading, removeAccount } = useAccounts();
+// Interfaz adaptada a la respuesta tipada de Prisma PostgreSQL
+export interface FinancialAccountItem {
+	id: string;
+	name: string;
+	type: "debit_card" | "credit_card" | "cash" | "savings";
+	balance: number | string;
+	creditLimit?: number | string | null;
+	cutoffDay?: number | null;
+	paymentDueDate?: number | null;
+	currency: string;
+}
 
-	if (loading) {
-		return (
-			<div className="text-center py-10 text-gray-500">
-				Cargando cuentas...
-			</div>
-		);
-	}
+interface AccountsListProps {
+	accounts: FinancialAccountItem[];
+	deleteAccountAction: (id: string) => Promise<void>;
+}
+
+export const AccountsList = ({
+	accounts,
+	deleteAccountAction,
+}: AccountsListProps) => {
+	const [isPending, startTransition] = useTransition();
+	const router = useRouter();
+
+	const handleDelete = (id: string) => {
+		startTransition(async () => {
+			await deleteAccountAction(id);
+			router.refresh();
+		});
+	};
 
 	return (
 		<div className="w-full">
 			{accounts.length === 0 ? (
 				<div className="text-center py-12 bg-[#17171a] border border-gray-800 rounded-xl">
 					<p className="text-gray-400 text-sm">
-						No hay cuentas o tarjetas registradas.
+						No hay cuentas o tarjetas registradas en la base de
+						datos.
 					</p>
 				</div>
 			) : (
 				<div className="grid grid-cols-1 md:grid-cols-2 gap-4">
 					{accounts.map((item) => {
 						const isCredit = item.type === "credit_card";
+						const balanceNum = Number(item.balance) || 0;
+						const limitNum = Number(item.creditLimit) || 0;
+
 						return (
 							<div
 								key={item.id}
@@ -61,9 +85,11 @@ export const AccountsList = ({ onOpenModal }: { onOpenModal: () => void }) => {
 										</div>
 										<button
 											onClick={() =>
-												removeAccount(item.id)
+												handleDelete(item.id)
 											}
-											className="text-gray-500 hover:text-red-400 transition p-1"
+											disabled={isPending}
+											className="text-gray-500 hover:text-red-400 transition p-1 disabled:opacity-50"
+											title="Eliminar cuenta"
 										>
 											<Trash2 size={16} />
 										</button>
@@ -77,26 +103,33 @@ export const AccountsList = ({ onOpenModal }: { onOpenModal: () => void }) => {
 														Límite de Crédito:
 													</span>
 													<span className="font-medium text-white">
-														$
-														{item.creditLimit?.toFixed(
-															2,
-														)}{" "}
+														${limitNum.toFixed(2)}{" "}
 														{item.currency}
 													</span>
 												</div>
-												<div className="flex justify-between text-gray-400">
-													<span>Día de Corte:</span>
-													<span className="font-medium text-white">
-														Día {item.cutoffDay}
-													</span>
-												</div>
-												<div className="flex justify-between text-gray-400">
-													<span>Límite de Pago:</span>
-													<span className="font-medium text-white">
-														Día{" "}
-														{item.paymentDueDate}
-													</span>
-												</div>
+												{item.cutoffDay && (
+													<div className="flex justify-between text-gray-400">
+														<span>
+															Día de Corte:
+														</span>
+														<span className="font-medium text-white">
+															Día {item.cutoffDay}
+														</span>
+													</div>
+												)}
+												{item.paymentDueDate && (
+													<div className="flex justify-between text-gray-400">
+														<span>
+															Límite de Pago:
+														</span>
+														<span className="font-medium text-white">
+															Día{" "}
+															{
+																item.paymentDueDate
+															}
+														</span>
+													</div>
+												)}
 											</>
 										) : (
 											<div className="flex justify-between items-center">
@@ -104,7 +137,7 @@ export const AccountsList = ({ onOpenModal }: { onOpenModal: () => void }) => {
 													Saldo Actual:
 												</span>
 												<span className="text-base font-bold text-emerald-400">
-													${item.balance.toFixed(2)}{" "}
+													${balanceNum.toFixed(2)}{" "}
 													{item.currency}
 												</span>
 											</div>

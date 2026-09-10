@@ -51,14 +51,21 @@ export default function DashboardLayout({
 			>
 				{/* Logo / Selector de Proyecto */}
 				<div className="h-16 border-b border-gray-800 px-4 flex items-center justify-between">
-					<div className="flex items-center gap-2">
-						<div className="w-7 h-7 bg-emerald-500 rounded-lg flex items-center justify-center font-bold text-black text-sm">
-							AF
+					<div className="flex items-center gap-3">
+						{/* Tipografía Principal de la Marca */}
+						<div className="flex flex-col">
+							<span className="font-bold text-white text-2xl tracking-tight leading-none">
+								Agente{""}
+								<span className="text-emerald-400 font-normal">
+									.finanzas
+								</span>
+							</span>
+							<span className="text-sm font-mono text-gray-400 tracking-widest uppercase mt-0.5">
+								AI ANALYTICS
+							</span>
 						</div>
-						<span className="font-semibold text-white tracking-wide">
-							agente-finanzas
-						</span>
 					</div>
+
 					<button
 						onClick={() => setSidebarOpen(false)}
 						className="lg:hidden text-gray-400 hover:text-white"
@@ -118,14 +125,6 @@ export default function DashboardLayout({
 
 					{/* Elementos Derechos del Navbar (Buscador, Notificaciones y Perfil de Usuario) */}
 					<div className="flex items-center gap-4">
-						<div className="hidden md:flex items-center gap-2 bg-[#1f1f23] border border-gray-800 px-3 py-1.5 rounded-lg text-xs text-gray-400">
-							<Search size={14} />
-							<span>Buscar comandos...</span>
-							<kbd className="bg-gray-800 px-1.5 py-0.5 rounded text-[10px] text-gray-300">
-								Ctrl K
-							</kbd>
-						</div>
-
 						<button className="text-gray-400 hover:text-white relative p-1.5 rounded-lg hover:bg-[#1f1f23]">
 							<Bell size={18} />
 						</button>

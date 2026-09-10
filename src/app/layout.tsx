@@ -1,7 +1,6 @@
 import type { Metadata } from "next";
 import { Inter } from "next/font/google";
 import "./globals.css";
-import { AccountProvider } from "@/context/AccountContext";
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -20,7 +19,7 @@ export default function RootLayout({
 			<body
 				className={`${inter.className} bg-[#121214] text-gray-100 antialiased`}
 			>
-				<AccountProvider>{children}</AccountProvider>
+				{children}
 			</body>
 		</html>
 	);

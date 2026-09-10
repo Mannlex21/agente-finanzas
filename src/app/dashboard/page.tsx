@@ -1,36 +1,35 @@
-"use client";
-
 import React from "react";
-import { useAccounts } from "@/context/AccountContext";
+import { prisma } from "@/lib/prisma";
+import { AccountType } from "@prisma/client";
 import { Wallet, CreditCard, DollarSign, ArrowUpRight } from "lucide-react";
 import Link from "next/link";
 
-export default function DashboardOverviewPage() {
-	const { accounts, loading } = useAccounts();
+export default async function DashboardOverviewPage() {
+	// Consulta directa a Supabase mediante Prisma
+	const accounts = await prisma.financialAccount.findMany({
+		orderBy: { createdAt: "desc" },
+	});
 
-	// Calcular métricas financieras en tiempo real
+	// Calcular métricas financieras en el servidor usando Decimal a Number
 	const totalBalance = accounts
-		.filter((acc) => acc.type !== "credit_card")
-		.reduce((acc, curr) => acc + curr.balance, 0);
+		.filter((acc) => acc.type !== AccountType.credit_card)
+		.reduce((acc, curr) => acc + curr.balance.toNumber(), 0);
 
 	const totalCreditLimit = accounts
-		.filter((acc) => acc.type === "credit_card")
-		.reduce((acc, curr) => acc + (curr.creditLimit || 0), 0);
+		.filter((acc) => acc.type === AccountType.credit_card)
+		.reduce(
+			(acc, curr) =>
+				acc + (curr.creditLimit ? curr.creditLimit.toNumber() : 0),
+			0,
+		);
 
 	const creditCardsCount = accounts.filter(
-		(acc) => acc.type === "credit_card",
-	).length;
-	const debitCardsCount = accounts.filter(
-		(acc) => acc.type !== "credit_card",
+		(acc) => acc.type === AccountType.credit_card,
 	).length;
 
-	if (loading) {
-		return (
-			<div className="text-gray-400 py-10">
-				Cargando resumen del sistema...
-			</div>
-		);
-	}
+	const debitCardsCount = accounts.filter(
+		(acc) => acc.type !== AccountType.credit_card,
+	).length;
 
 	return (
 		<div className="max-w-6xl mx-auto space-y-8">
@@ -106,7 +105,7 @@ export default function DashboardOverviewPage() {
 				</div>
 			</div>
 
-			{/* Panel de Accesos Rápidos (Similar a la sección "Get Connected" de Supabase) */}
+			{/* Panel de Accesos Rápidos */}
 			<div className="bg-[#17171a] border border-gray-800 rounded-xl p-6">
 				<h3 className="text-sm font-semibold text-white uppercase tracking-wider mb-4">
 					Módulos del Sistema
