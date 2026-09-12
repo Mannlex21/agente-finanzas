@@ -10,7 +10,7 @@ async function deleteAccountAction(id: string) {
 	await prisma.financialAccount.delete({
 		where: { id },
 	});
-	revalidatePath("/cuentas");
+	revalidatePath("/dashboard/accounts");
 }
 
 export default async function AccountsPage() {

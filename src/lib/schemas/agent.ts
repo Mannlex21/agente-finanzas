@@ -113,51 +113,70 @@ export const createAccountSchema = z.object({
 		.describe("Día del mes límite para realizar el pago (1-31)"),
 });
 
-export type ProcessedTransaction = {
-	id: string;
-	amount: number;
-	type: "expense" | "income" | "transfer";
-	category: string;
-	description: string;
-	accountName: string;
-	date: string;
-	accountBalance: number;
-};
+// Schema genérico para una sola acción
+export const actionSchema = z.object({
+	intent: z
+		.enum(["create_transaction", "create_budget", "create_account"])
+		.describe("Tipo de acción solicitada por el usuario"),
+	transactionData: createTransactionSchema.optional(),
+	budgetData: createBudgetSchema.optional(),
+	accountData: createAccountSchema.optional(),
+});
 
-export type ProcessedBudget = {
-	id: string;
+// Schema contenedor para múltiple procesamiento en lote
+export const multiActionSchema = z.object({
+	actions: z
+		.array(actionSchema)
+		.min(1)
+		.describe(
+			"Lista de todas las intenciones detectadas en el mensaje del usuario",
+		),
+});
+
+export interface ProcessedBudget {
+	id?: string;
 	categoria: string;
 	limite: number;
-};
+	// Soportes opcionales en inglés
+	category?: string;
+	limit?: number;
+}
 
-export type ProcessedAccount = {
-	id: string;
+export interface ProcessedTransaction {
+	id?: string;
+	type: "expense" | "income" | "transfer";
+	amount: number;
+	description?: string;
+	category?: string;
+	date?: string;
+	accountName?: string;
+	accountBalance?: number;
+}
+
+export interface ProcessedAccount {
+	id?: string;
 	name: string;
-	type: string;
+	type: "bank" | "credit_card" | "cash" | "investment";
 	balance: number;
-	creditLimit?: number | null;
-	cutoffDay?: number | null;
-	paymentDueDate?: number | null;
-};
+	// Campos en camelCase / inglés
+	creditLimit?: number;
+	cutoffDay?: number;
+	paymentDueDate?: number;
+	// Soportes opcionales en español
+	limiteCredito?: number;
+	cierre?: number;
+	limitePago?: number;
+}
 
 export type ProcessFinancialPromptResult =
 	| {
 			success: true;
 			message: string;
-			type: "transaction";
-			data: ProcessedTransaction;
-	  }
-	| {
-			success: true;
-			message: string;
-			type: "budget";
-			data: ProcessedBudget;
-	  }
-	| {
-			success: true;
-			message: string;
-			type: "account";
-			data: ProcessedAccount;
+			results: Array<
+				| { type: "transaction"; data: ProcessedTransaction }
+				| { type: "budget"; data: ProcessedBudget }
+				| { type: "account"; data: ProcessedAccount }
+			>;
 	  }
 	| {
 			success: false;

@@ -10,6 +10,7 @@ import {
 	Wallet,
 	AlertCircle,
 	CheckCircle2,
+	Mic,
 } from "lucide-react";
 import { processFinancialPrompt } from "@/app/actions/agent";
 import {
@@ -18,56 +19,25 @@ import {
 	ProcessedTransaction,
 } from "@/lib/schemas/agent";
 
-type ChatEntry =
-	| { id: string; role: "user"; text: string }
-	| {
-			id: string;
-			role: "assistant";
-			text: string;
-			type?: undefined;
-			data?: undefined;
-			error?: undefined;
-	  }
-	| {
-			id: string;
-			role: "assistant";
-			text: string;
-			type: "transaction";
-			data: ProcessedTransaction;
-			error?: undefined;
-	  }
-	| {
-			id: string;
-			role: "assistant";
-			text: string;
-			type: "budget";
-			data: ProcessedBudget;
-			error?: undefined;
-	  }
-	| {
-			id: string;
-			role: "assistant";
-			text: string;
-			type: "account";
-			data: ProcessedAccount;
-			error?: undefined;
-	  }
-	| {
-			id: string;
-			role: "assistant";
-			text: string;
-			type?: undefined;
-			data?: undefined;
-			error: string;
-	  };
+type ChatEntry = {
+	id: string;
+	role: "user" | "assistant";
+	text: string;
+	results?: Array<
+		| { type: "transaction"; data: ProcessedTransaction }
+		| { type: "budget"; data: ProcessedBudget }
+		| { type: "account"; data: ProcessedAccount }
+	>;
+	error?: string;
+};
 
 const EXAMPLES = [
 	"Gasté $350 en gasolina con mi tarjeta BBVA",
-	"Me depositaron $15,000 de nómina en BBVA Nómina",
-	"Pagué $620 de luz con Efectivo",
+	"Crea un presupuesto de $4,000 para Alimentos",
+	"Agrega una tarjeta de débito Nu con saldo inicial de $2,500",
 ];
 
-const TYPE_LABEL: Record<ProcessedTransaction["type"], string> = {
+const TYPE_LABEL: Record<string, string> = {
 	expense: "Gasto",
 	income: "Ingreso",
 	transfer: "Transferencia",
@@ -94,6 +64,7 @@ export default function AIAgentPage() {
 	const [prompt, setPrompt] = useState("");
 	const [history, setHistory] = useState<ChatEntry[]>([]);
 	const [isPending, startTransition] = useTransition();
+	const [isListening, setIsListening] = useState(false);
 	const listRef = useRef<HTMLDivElement>(null);
 
 	const scrollToBottom = () => {
@@ -104,21 +75,19 @@ export default function AIAgentPage() {
 			});
 		});
 	};
-
 	const submitPrompt = (text: string) => {
 		const message = text.trim();
 		if (!message || isPending) return;
 
-		// 1. Guardar copia del texto original
 		const previousText = message;
-
 		const userId = crypto.randomUUID();
+
 		setHistory((prev) => [
 			...prev,
 			{ id: userId, role: "user", text: message },
 		]);
 
-		setPrompt(""); // Limpiamos el textarea
+		setPrompt("");
 		scrollToBottom();
 
 		startTransition(async () => {
@@ -126,43 +95,16 @@ export default function AIAgentPage() {
 				const result = await processFinancialPrompt(message);
 
 				if (result.success) {
-					// Dependiendo del tipo de resultado, agregamos con el tipado correcto
-					if (result.type === "transaction") {
-						setHistory((prev) => [
-							...prev,
-							{
-								id: crypto.randomUUID(),
-								role: "assistant",
-								text: result.message,
-								type: "transaction",
-								data: result.data,
-							},
-						]);
-					} else if (result.type === "budget") {
-						setHistory((prev) => [
-							...prev,
-							{
-								id: crypto.randomUUID(),
-								role: "assistant",
-								text: result.message,
-								type: "budget",
-								data: result.data,
-							},
-						]);
-					} else if (result.type === "account") {
-						setHistory((prev) => [
-							...prev,
-							{
-								id: crypto.randomUUID(),
-								role: "assistant",
-								text: result.message,
-								type: "account",
-								data: result.data,
-							},
-						]);
-					}
+					setHistory((prev) => [
+						...prev,
+						{
+							id: crypto.randomUUID(),
+							role: "assistant",
+							text: result.message || "Procesado correctamente.",
+							results: result.results,
+						},
+					]);
 				} else {
-					// Si falla, devolvemos el texto al textarea
 					setPrompt(previousText);
 
 					setHistory((prev) => [
@@ -170,8 +112,9 @@ export default function AIAgentPage() {
 						{
 							id: crypto.randomUUID(),
 							role: "assistant",
-							text: result.error,
-							error: result.error,
+							text:
+								result.error || "Ocurrió un error al procesar.",
+							error: result.error || "Error indeterminado.",
 						},
 					]);
 				}
@@ -181,6 +124,7 @@ export default function AIAgentPage() {
 					error instanceof Error
 						? error.message
 						: "Error desconocido al procesar la solicitud.";
+
 				setHistory((prev) => [
 					...prev,
 					{
@@ -199,7 +143,23 @@ export default function AIAgentPage() {
 		e.preventDefault();
 		submitPrompt(prompt);
 	};
+	const textareaRef = useRef<HTMLTextAreaElement>(null);
 
+	const adjustTextareaHeight = () => {
+		const textarea = textareaRef.current;
+		if (textarea) {
+			textarea.style.height = "auto";
+			const newHeight = Math.min(textarea.scrollHeight, 96);
+			textarea.style.height = `${newHeight}px`;
+
+			// Mostrar scroll solo si el contenido supera la altura máxima
+			if (textarea.scrollHeight > 96) {
+				textarea.style.overflowY = "auto";
+			} else {
+				textarea.style.overflowY = "hidden";
+			}
+		}
+	};
 	return (
 		<div className="max-w-4xl mx-auto h-[calc(100vh-8.5rem)] flex flex-col gap-5">
 			<div className="bg-[#17171a] border border-gray-800 rounded-xl p-6 shadow-sm flex items-center justify-between shrink-0">
@@ -212,10 +172,8 @@ export default function AIAgentPage() {
 							Agente IA
 						</h1>
 						<p className="text-xs text-gray-400 mt-0.5">
-							Describe un gasto, ingreso, presupuesto o nueva
-							cuenta en lenguaje natural. Lo procesamos
-							automáticamente y actualizamos tus finanzas en
-							tiempo real.
+							Registra movimientos, crea presupuestos o agrega
+							cuentas con lenguaje natural o dictado por voz.
 						</p>
 					</div>
 				</div>
@@ -235,9 +193,9 @@ export default function AIAgentPage() {
 								Consola del agente
 							</p>
 							<p className="text-xs text-gray-400 mt-1 max-w-md">
-								Ejemplo: “Gasté $350 en gasolina con mi tarjeta
-								BBVA”. El modelo extrae monto, categoría y
-								cuenta, y guarda el movimiento.
+								Escribe o dicta lo que deseas realizar (gastos,
+								presupuestos o cuentas) y la IA interpretará los
+								datos para actualizar tus finanzas.
 							</p>
 							<div className="flex flex-wrap justify-center gap-2 mt-5">
 								{EXAMPLES.map((example) => (
@@ -296,21 +254,43 @@ export default function AIAgentPage() {
 											<p className="text-sm text-gray-200">
 												{entry.text}
 											</p>
-											{entry.type === "transaction" && (
-												<TransactionCard
-													tx={entry.data}
-												/>
-											)}
-											{entry.type === "budget" && (
-												<BudgetCard
-													budget={entry.data}
-												/>
-											)}
-											{entry.type === "account" && (
-												<AccountCard
-													account={entry.data}
-												/>
-											)}
+											{entry.results &&
+												entry.results.length > 0 && (
+													<div className="space-y-3 pt-1">
+														{entry.results.map(
+															(res, index) => (
+																<React.Fragment
+																	key={index}
+																>
+																	{res.type ===
+																		"transaction" && (
+																		<TransactionCard
+																			tx={
+																				res.data
+																			}
+																		/>
+																	)}
+																	{res.type ===
+																		"budget" && (
+																		<BudgetCard
+																			budget={
+																				res.data
+																			}
+																		/>
+																	)}
+																	{res.type ===
+																		"account" && (
+																		<AccountCard
+																			account={
+																				res.data
+																			}
+																		/>
+																	)}
+																</React.Fragment>
+															),
+														)}
+													</div>
+												)}
 										</>
 									)}
 								</div>
@@ -321,7 +301,7 @@ export default function AIAgentPage() {
 					{isPending && (
 						<div className="flex items-center gap-2 text-emerald-400 text-xs">
 							<Loader2 size={14} className="animate-spin" />
-							Analizando el mensaje y registrando la transacción…
+							Analizando tu solicitud y actualizando datos…
 						</div>
 					)}
 				</div>
@@ -332,19 +312,31 @@ export default function AIAgentPage() {
 				>
 					<div className="flex items-end gap-2">
 						<textarea
+							ref={textareaRef}
 							value={prompt}
-							onChange={(e) => setPrompt(e.target.value)}
+							onChange={(e) => {
+								setPrompt(e.target.value);
+								adjustTextareaHeight();
+							}}
 							onKeyDown={(e) => {
 								if (e.key === "Enter" && !e.shiftKey) {
 									e.preventDefault();
 									submitPrompt(prompt);
+									if (textareaRef.current) {
+										textareaRef.current.style.height =
+											"auto";
+										textareaRef.current.style.overflowY =
+											"hidden";
+									}
 								}
 							}}
-							placeholder="Escribe un gasto o ingreso…"
-							rows={2}
+							placeholder="P. ej. Gasté $200 en café..."
+							rows={1}
 							disabled={isPending}
-							className="flex-1 resize-none rounded-xl bg-[#1f1f23] border border-gray-800 p-3 text-sm text-white placeholder:text-zinc-600 focus:outline-none focus:border-emerald-500 disabled:opacity-60"
+							className="flex-1 resize-none overflow-hidden min-h-[44px] max-h-24 rounded-xl bg-[#1f1f23] border border-gray-800 p-3 text-sm text-white placeholder:text-zinc-600 focus:outline-none focus:border-emerald-500 disabled:opacity-60"
 						/>
+
+						{/* Botón de Enviar */}
 						<button
 							type="submit"
 							disabled={isPending || !prompt.trim()}
@@ -366,6 +358,9 @@ export default function AIAgentPage() {
 
 function TransactionCard({ tx }: { tx: ProcessedTransaction }) {
 	const isIncome = tx.type === "income";
+	const amount = typeof tx.amount === "number" ? tx.amount : 0;
+	const accountBalance =
+		typeof tx.accountBalance === "number" ? tx.accountBalance : 0;
 
 	return (
 		<div className="rounded-xl bg-[#141416] border border-gray-800 p-4 space-y-3">
@@ -380,7 +375,7 @@ function TransactionCard({ tx }: { tx: ProcessedTransaction }) {
 							: "text-red-300 bg-red-950/30 border-red-900/40"
 					}`}
 				>
-					{TYPE_LABEL[tx.type]}
+					{TYPE_LABEL[tx.type] ?? tx.type}
 				</span>
 			</div>
 			<div className="grid grid-cols-2 gap-2 text-xs">
@@ -389,7 +384,7 @@ function TransactionCard({ tx }: { tx: ProcessedTransaction }) {
 						Descripción
 					</span>
 					<span className="text-white font-medium">
-						{tx.description}
+						{tx.description || "Sin descripción"}
 					</span>
 				</div>
 				<div className="bg-[#1f1f23] border border-gray-800 rounded-lg p-2.5">
@@ -400,7 +395,7 @@ function TransactionCard({ tx }: { tx: ProcessedTransaction }) {
 						className={`font-medium ${isIncome ? "text-emerald-400" : "text-white"}`}
 					>
 						{isIncome ? "+" : "-"}
-						{formatMoney(tx.amount)}
+						{formatMoney(amount)}
 					</span>
 				</div>
 				<div className="bg-[#1f1f23] border border-gray-800 rounded-lg p-2.5">
@@ -408,7 +403,7 @@ function TransactionCard({ tx }: { tx: ProcessedTransaction }) {
 						Categoría
 					</span>
 					<span className="text-white font-medium">
-						{tx.category}
+						{tx.category || "General"}
 					</span>
 				</div>
 				<div className="bg-[#1f1f23] border border-gray-800 rounded-lg p-2.5">
@@ -416,17 +411,17 @@ function TransactionCard({ tx }: { tx: ProcessedTransaction }) {
 						Fecha
 					</span>
 					<span className="text-white font-medium">
-						{formatDate(tx.date)}
+						{tx.date ? formatDate(tx.date) : "N/A"}
 					</span>
 				</div>
 				<div className="bg-[#1f1f23] border border-gray-800 rounded-lg p-2.5 col-span-2">
 					<div className="flex items-center justify-between">
 						<div className="flex items-center gap-2 text-gray-400">
 							<Wallet size={14} className="text-emerald-400" />
-							<span>{tx.accountName}</span>
+							<span>{tx.accountName || "Cuenta"}</span>
 						</div>
 						<span className="text-white font-medium">
-							Saldo {formatMoney(tx.accountBalance)}
+							Saldo {formatMoney(accountBalance)}
 						</span>
 					</div>
 				</div>
@@ -434,7 +429,11 @@ function TransactionCard({ tx }: { tx: ProcessedTransaction }) {
 		</div>
 	);
 }
+
 function BudgetCard({ budget }: { budget: ProcessedBudget }) {
+	const category = budget.categoria ?? budget.category ?? "General";
+	const limit = budget.limite ?? budget.limit ?? 0;
+
 	return (
 		<div className="rounded-xl bg-[#141416] border border-gray-800 p-4 space-y-3 max-w-md">
 			<div className="flex items-center justify-between">
@@ -450,16 +449,14 @@ function BudgetCard({ budget }: { budget: ProcessedBudget }) {
 					<span className="text-gray-500 block text-[10px]">
 						Categoría
 					</span>
-					<span className="text-white font-medium">
-						{budget.categoria}
-					</span>
+					<span className="text-white font-medium">{category}</span>
 				</div>
 				<div className="bg-[#1f1f23] border border-gray-800 rounded-lg p-2.5">
 					<span className="text-gray-500 block text-[10px]">
 						Límite Asignado
 					</span>
 					<span className="text-emerald-400 font-medium">
-						{formatMoney(budget.limite)}
+						{formatMoney(limit)}
 					</span>
 				</div>
 			</div>
@@ -469,6 +466,10 @@ function BudgetCard({ budget }: { budget: ProcessedBudget }) {
 
 function AccountCard({ account }: { account: ProcessedAccount }) {
 	const isCredit = account.type === "credit_card";
+
+	const creditLimit = account.creditLimit ?? account.limiteCredito;
+	const cutoffDay = account.cutoffDay ?? account.cierre;
+	const paymentDueDate = account.paymentDueDate ?? account.limitePago;
 
 	return (
 		<div className="rounded-xl bg-[#141416] border border-gray-800 p-3.5 space-y-2.5 text-xs">
@@ -495,12 +496,11 @@ function AccountCard({ account }: { account: ProcessedAccount }) {
 						{isCredit ? "Deuda Actual" : "Saldo Inicial"}
 					</span>
 					<span className="text-emerald-400 font-semibold block">
-						{formatMoney(account.balance)}
+						{formatMoney(account.balance ?? 0)}
 					</span>
 				</div>
 			</div>
 
-			{/* Bloque exclusivo para tarjetas de crédito */}
 			{isCredit && (
 				<div className="grid grid-cols-3 gap-2 pt-1">
 					<div className="bg-[#1f1f23] p-2 rounded-lg border border-gray-800">
@@ -508,9 +508,7 @@ function AccountCard({ account }: { account: ProcessedAccount }) {
 							Límite Crédito
 						</span>
 						<span className="text-white font-medium block">
-							{account.creditLimit
-								? formatMoney(account.creditLimit)
-								: "N/A"}
+							{creditLimit ? formatMoney(creditLimit) : "N/A"}
 						</span>
 					</div>
 					<div className="bg-[#1f1f23] p-2 rounded-lg border border-gray-800">
@@ -518,9 +516,7 @@ function AccountCard({ account }: { account: ProcessedAccount }) {
 							Día Corte
 						</span>
 						<span className="text-gray-200 font-medium block">
-							{account.cutoffDay
-								? `Día ${account.cutoffDay}`
-								: "N/A"}
+							{cutoffDay ? `Día ${cutoffDay}` : "N/A"}
 						</span>
 					</div>
 					<div className="bg-[#1f1f23] p-2 rounded-lg border border-gray-800">
@@ -528,9 +524,7 @@ function AccountCard({ account }: { account: ProcessedAccount }) {
 							Límite Pago
 						</span>
 						<span className="text-gray-200 font-medium block">
-							{account.paymentDueDate
-								? `Día ${account.paymentDueDate}`
-								: "N/A"}
+							{paymentDueDate ? `Día ${paymentDueDate}` : "N/A"}
 						</span>
 					</div>
 				</div>

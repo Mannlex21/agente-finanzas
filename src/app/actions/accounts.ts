@@ -32,5 +32,5 @@ export async function createAccountAction(data: CreateAccountInput) {
 		},
 	});
 
-	revalidatePath("/cuentas");
+	revalidatePath("/dashboard/accounts");
 }

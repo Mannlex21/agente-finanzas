@@ -19,6 +19,8 @@ import {
 	User,
 	HelpCircle,
 	ChevronDown,
+	PanelLeftClose,
+	PanelLeft,
 } from "lucide-react";
 import { AccountModal } from "../components/AccountModal";
 
@@ -65,7 +67,6 @@ export default function DashboardLayout({
 		getProfile();
 	}, [supabase]);
 
-	// Cerrar el dropdown al hacer clic fuera
 	useEffect(() => {
 		function handleClickOutside(event: MouseEvent) {
 			if (
@@ -102,24 +103,31 @@ export default function DashboardLayout({
 
 	return (
 		<div className="min-h-screen bg-[#1c1c1e] text-gray-200 flex">
-			{/* Sidebar Lateral Estilo Supabase */}
+			{/* Sidebar Lateral Adaptable */}
 			<aside
-				className={`fixed inset-y-0 left-0 z-40 w-64 bg-[#141416] border-r border-gray-800 flex flex-col transition-transform duration-200 lg:translate-x-0 ${sidebarOpen ? "translate-x-0" : "-translate-x-full"}`}
+				className={`fixed inset-y-0 left-0 z-40 bg-[#141416] border-r border-gray-800 flex flex-col transition-all duration-300 ease-in-out ${
+					sidebarOpen ? "w-64" : "w-16"
+				}`}
 			>
-				{/* Logo */}
-				<div className="h-16 border-b border-gray-800 px-4 flex items-center justify-between">
+				{/* Header del Sidebar (Logo siempre visible) */}
+				<div className="h-16 border-b border-gray-800 px-4 flex items-center justify-between overflow-hidden">
 					<div className="flex items-center gap-3">
-						<div className="flex flex-col">
-							<span className="font-bold text-white text-2xl tracking-tight leading-none">
-								Agente
-								<span className="text-emerald-400 font-normal">
-									.finanzas
-								</span>
-							</span>
-							<span className="text-sm font-mono text-gray-400 tracking-widest uppercase mt-0.5">
-								AI ANALYTICS
-							</span>
+						<div className="flex-shrink-0 w-8 h-8 rounded-lg bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-400 font-bold text-lg">
+							A
 						</div>
+						{sidebarOpen && (
+							<div className="flex flex-col whitespace-nowrap transition-opacity duration-200">
+								<span className="font-bold text-white text-lg tracking-tight leading-none">
+									Agente
+									<span className="text-emerald-400 font-normal">
+										.finanzas
+									</span>
+								</span>
+								<span className="text-[10px] font-mono text-gray-400 tracking-widest uppercase mt-0.5">
+									AI ANALYTICS
+								</span>
+							</div>
+						)}
 					</div>
 
 					<button
@@ -130,11 +138,29 @@ export default function DashboardLayout({
 					</button>
 				</div>
 
+				{/* Botón Agente IA */}
+				<div className="p-3 border-b border-gray-800">
+					<Link
+						href="/dashboard/ai-agent"
+						className={`flex items-center justify-center gap-2 bg-emerald-600 hover:bg-emerald-500 text-black font-medium py-2 rounded-lg text-sm transition shadow-sm ${
+							sidebarOpen
+								? "w-full px-3"
+								: "w-10 h-10 p-0 mx-auto"
+						}`}
+						title="Agente IA"
+					>
+						<Sparkles size={16} className="flex-shrink-0" />
+						{sidebarOpen && <span>Agente IA</span>}
+					</Link>
+				</div>
+
 				{/* Links de Navegación */}
-				<div className="flex-1 py-4 px-3 space-y-1 overflow-y-auto">
-					<div className="text-xs font-semibold text-gray-500 uppercase px-3 mb-2 tracking-wider">
-						General
-					</div>
+				<div className="flex-1 py-4 px-2 space-y-1 overflow-y-auto">
+					{sidebarOpen && (
+						<div className="text-[10px] font-semibold text-gray-500 uppercase px-3 mb-2 tracking-wider">
+							General
+						</div>
+					)}
 					{navigationItems.map((item) => {
 						const Icon = item.icon;
 						const isActive = pathname === item.href;
@@ -142,45 +168,61 @@ export default function DashboardLayout({
 							<Link
 								key={item.href}
 								href={item.href}
+								title={!sidebarOpen ? item.name : undefined}
 								className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${
+									sidebarOpen ? "" : "justify-center"
+								} ${
 									isActive
 										? "bg-[#27272a] text-emerald-400 border border-gray-700/50"
 										: "text-gray-400 hover:bg-[#1f1f23] hover:text-gray-200"
 								}`}
 							>
-								<Icon size={18} />
-								{item.name}
+								<Icon size={18} className="flex-shrink-0" />
+								{sidebarOpen && (
+									<span className="truncate whitespace-nowrap">
+										{item.name}
+									</span>
+								)}
 							</Link>
 						);
 					})}
 				</div>
-
-				{/* Footer del Sidebar */}
-				<div className="p-4 border-t border-gray-800">
-					<Link
-						href="/dashboard/ai-agent"
-						className="block w-full bg-emerald-600 hover:bg-emerald-500 text-black font-medium py-2 rounded-lg text-sm transition shadow-sm text-center"
-					>
-						<Sparkles size={16} className="inline-block mr-1" />
-						Agente IA
-					</Link>
-				</div>
 			</aside>
 
-			{/* Contenedor Principal (Navbar + Contenido) */}
-			<div className="flex-1 lg:pl-64 flex flex-col min-w-0">
+			{/* Contenedor Principal (Sincronizado dinámicamente con pl-64 / pl-16) */}
+			<div
+				className={`flex-1 flex flex-col min-w-0 transition-all duration-300 ease-in-out ${
+					sidebarOpen ? "lg:pl-64" : "lg:pl-16"
+				}`}
+			>
 				{/* Navbar Superior */}
 				<header className="h-16 border-b border-gray-800 bg-[#141416]/80 backdrop-blur-md px-6 flex items-center justify-between sticky top-0 z-30">
 					<div className="flex items-center gap-4">
+						{/* Toggle para Móvil */}
 						<button
 							onClick={() => setSidebarOpen(!sidebarOpen)}
 							className="lg:hidden text-gray-400 hover:text-white"
 						>
 							<Menu size={22} />
 						</button>
+
+						{/* Toggle para Escritorio */}
+						<button
+							onClick={() => setSidebarOpen(!sidebarOpen)}
+							className="hidden lg:flex items-center text-gray-400 hover:text-white p-1.5 rounded-lg hover:bg-[#1f1f23] transition-colors"
+							title={
+								sidebarOpen ? "Colapsar menú" : "Expandir menú"
+							}
+						>
+							{sidebarOpen ? (
+								<PanelLeftClose size={20} />
+							) : (
+								<PanelLeft size={20} />
+							)}
+						</button>
 					</div>
 
-					{/* Elementos Derechos del Navbar (Notificaciones y Perfil con Dropdown) */}
+					{/* Elementos Derechos del Navbar */}
 					<div className="flex items-center gap-4">
 						<button className="text-gray-400 hover:text-white relative p-1.5 rounded-lg hover:bg-[#1f1f23]">
 							<Bell size={18} />
@@ -209,7 +251,7 @@ export default function DashboardLayout({
 								</div>
 							</button>
 
-							{/* Menú Desplegable Flotante */}
+							{/* Menú Desplegable */}
 							{dropdownOpen && (
 								<div className="absolute right-0 mt-2.5 w-56 bg-[#141416] border border-gray-800 rounded-xl shadow-2xl py-2 z-50 animate-in fade-in slide-in-from-top-2 duration-150">
 									<div className="px-4 py-2 border-b border-gray-800">
@@ -276,7 +318,6 @@ export default function DashboardLayout({
 				</main>
 			</div>
 
-			{/* Modal global de cuentas */}
 			<AccountModal
 				isOpen={isModalOpen}
 				onClose={() => setIsModalOpen(false)}
