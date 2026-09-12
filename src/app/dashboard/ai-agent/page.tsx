@@ -310,33 +310,50 @@ export default function AIAgentPage() {
 					onSubmit={handleSubmit}
 					className="border-t border-gray-800 p-4 bg-[#141416]"
 				>
-					<div className="flex items-end gap-2">
-						<textarea
-							ref={textareaRef}
-							value={prompt}
-							onChange={(e) => {
-								setPrompt(e.target.value);
-								adjustTextareaHeight();
-							}}
-							onKeyDown={(e) => {
-								if (e.key === "Enter" && !e.shiftKey) {
-									e.preventDefault();
-									submitPrompt(prompt);
-									if (textareaRef.current) {
-										textareaRef.current.style.height =
-											"auto";
-										textareaRef.current.style.overflowY =
-											"hidden";
+					<div className="flex items-start gap-3">
+						{/* Columna Izquierda: Textarea (2 filas base) + Contador abajo a la derecha */}
+						<div className="flex-1 flex flex-col gap-1">
+							<textarea
+								ref={textareaRef}
+								value={prompt}
+								maxLength={500}
+								onChange={(e) => {
+									setPrompt(e.target.value);
+									adjustTextareaHeight();
+								}}
+								onKeyDown={(e) => {
+									if (e.key === "Enter" && !e.shiftKey) {
+										e.preventDefault();
+										submitPrompt(prompt);
+										if (textareaRef.current) {
+											textareaRef.current.style.height =
+												"auto";
+											textareaRef.current.style.overflowY =
+												"hidden";
+										}
 									}
-								}
-							}}
-							placeholder="P. ej. Gasté $200 en café..."
-							rows={1}
-							disabled={isPending}
-							className="flex-1 resize-none overflow-hidden min-h-[44px] max-h-24 rounded-xl bg-[#1f1f23] border border-gray-800 p-3 text-sm text-white placeholder:text-zinc-600 focus:outline-none focus:border-emerald-500 disabled:opacity-60"
-						/>
+								}}
+								placeholder="P. ej. Gasté $200 en café..."
+								rows={2}
+								disabled={isPending}
+								className="w-full resize-none overflow-hidden min-h-[62px] max-h-24 rounded-xl bg-[#1f1f23] border border-gray-800 p-3 text-sm text-white placeholder:text-zinc-600 focus:outline-none focus:border-emerald-500 disabled:opacity-60"
+							/>
 
-						{/* Botón de Enviar */}
+							{/* Contador posicionado únicamente debajo del textarea */}
+							<div className="flex justify-end px-1">
+								<span
+									className={`text-[10px] font-mono transition-colors ${
+										500 - prompt.length <= 20
+											? "text-red-400 font-bold"
+											: "text-zinc-500"
+									}`}
+								>
+									{500 - prompt.length}
+								</span>
+							</div>
+						</div>
+
+						{/* Columna Derecha: Botón de Enviar */}
 						<button
 							type="submit"
 							disabled={isPending || !prompt.trim()}
