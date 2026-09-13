@@ -18,7 +18,7 @@ export async function middleware(request: NextRequest) {
 					return request.cookies.getAll();
 				},
 				setAll(cookiesToSet) {
-					cookiesToSet.forEach(({ name, value, options }) =>
+					cookiesToSet.forEach(({ name, value }) =>
 						request.cookies.set(name, value),
 					);
 					response = NextResponse.next({
@@ -38,24 +38,17 @@ export async function middleware(request: NextRequest) {
 		data: { user },
 	} = await supabase.auth.getUser();
 
-	// Proteger rutas de dashboard
-	if (request.nextUrl.pathname.startsWith("/dashboard")) {
-		if (!user) {
-			const loginUrl = new URL("/login", request.url);
-			return NextResponse.redirect(loginUrl);
-		}
+	const pathname = request.nextUrl.pathname;
+	const isAuthFormRoute = pathname === "/login" || pathname === "/signup";
+
+	// 1. Si NO hay usuario y quiere acceder a subrutas privadas (no la raíz ni auth) -> Redirigir a /login
+	if (pathname !== "/" && !isAuthFormRoute && !user) {
+		return NextResponse.redirect(new URL("/login", request.url));
 	}
 
-	// Redirigir si ya está autenticado e intenta acceder a login/signup o landing root si está autenticado
-	if (
-		request.nextUrl.pathname === "/" ||
-		request.nextUrl.pathname === "/login" ||
-		request.nextUrl.pathname === "/signup"
-	) {
-		if (user) {
-			const dashboardUrl = new URL("/dashboard", request.url);
-			return NextResponse.redirect(dashboardUrl);
-		}
+	// // 2. Si SÍ hay usuario e intenta entrar a /login o /signup -> Redirigir al dashboard
+	if (isAuthFormRoute && user) {
+		return NextResponse.redirect(new URL("/dashboard", request.url));
 	}
 
 	return response;

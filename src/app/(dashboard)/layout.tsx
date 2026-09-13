@@ -1,19 +1,13 @@
+// src/app/(dashboard)/layout.tsx
 "use client";
 
 import React, { useState, useEffect, useRef } from "react";
 import Link from "next/link";
-import { usePathname, useRouter } from "next/navigation";
+import { useRouter } from "next/navigation";
 import type { User as SupabaseUser } from "@supabase/supabase-js";
 import { createClient } from "../../lib/supabase/client";
 import {
-	LayoutDashboard,
-	CreditCard,
-	Wallet,
-	PieChart,
-	Settings,
 	Bell,
-	X,
-	Sparkles,
 	Menu,
 	LogOut,
 	User,
@@ -23,37 +17,24 @@ import {
 	PanelLeft,
 } from "lucide-react";
 import { AccountModal } from "../components/AccountModal";
+import { Sidebar } from "../components/Sidebar";
 
 export default function DashboardLayout({
 	children,
 }: {
 	children: React.ReactNode;
 }) {
-	const pathname = usePathname();
 	const router = useRouter();
 	const supabase = createClient();
 	const [isModalOpen, setIsModalOpen] = useState(false);
-	const [sidebarOpen, setSidebarOpen] = useState(true);
+
+	// Estados independientes para Móvil y Escritorio
+	const [mobileOpen, setMobileOpen] = useState(false);
+	const [desktopCollapsed, setDesktopCollapsed] = useState(false);
 
 	const [user, setUser] = useState<SupabaseUser | null>(null);
 	const [dropdownOpen, setDropdownOpen] = useState(false);
 	const dropdownRef = useRef<HTMLDivElement>(null);
-
-	const navigationItems = [
-		{ name: "Resumen", href: "/dashboard", icon: LayoutDashboard },
-		{
-			name: "Cuentas y Tarjetas",
-			href: "/dashboard/accounts",
-			icon: CreditCard,
-		},
-		{
-			name: "Transacciones",
-			href: "/dashboard/transactions",
-			icon: Wallet,
-		},
-		{ name: "Presupuestos", href: "/dashboard/budgets", icon: PieChart },
-		{ name: "Configuración", href: "/dashboard/settings", icon: Settings },
-	];
 
 	useEffect(() => {
 		async function getProfile() {
@@ -103,127 +84,66 @@ export default function DashboardLayout({
 
 	return (
 		<div className="min-h-screen bg-[#1c1c1e] text-gray-200 flex">
-			{/* Sidebar Lateral Adaptable */}
-			<aside
-				className={`fixed inset-y-0 left-0 z-40 bg-[#141416] border-r border-gray-800 flex flex-col transition-all duration-300 ease-in-out ${
-					sidebarOpen ? "w-64" : "w-16"
-				}`}
-			>
-				{/* Header del Sidebar (Logo siempre visible) */}
-				<div className="h-16 border-b border-gray-800 px-4 flex items-center justify-between overflow-hidden">
-					<div className="flex items-center gap-3">
-						<div className="flex-shrink-0 w-8 h-8 rounded-lg bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-400 font-bold text-lg">
-							A
-						</div>
-						{sidebarOpen && (
-							<div className="flex flex-col whitespace-nowrap transition-opacity duration-200">
-								<span className="font-bold text-white text-lg tracking-tight leading-none">
-									Agente
-									<span className="text-emerald-400 font-normal">
-										.finanzas
-									</span>
-								</span>
-								<span className="text-[10px] font-mono text-gray-400 tracking-widest uppercase mt-0.5">
-									AI ANALYTICS
-								</span>
-							</div>
-						)}
-					</div>
+			{/* Componente Sidebar aislado */}
+			<Sidebar
+				mobileOpen={mobileOpen}
+				setMobileOpen={setMobileOpen}
+				desktopCollapsed={desktopCollapsed}
+			/>
 
-					<button
-						onClick={() => setSidebarOpen(false)}
-						className="lg:hidden text-gray-400 hover:text-white"
-					>
-						<X size={20} />
-					</button>
-				</div>
-
-				{/* Botón Agente IA */}
-				<div className="p-3 border-b border-gray-800">
-					<Link
-						href="/dashboard/ai-agent"
-						className={`flex items-center justify-center gap-2 bg-emerald-600 hover:bg-emerald-500 text-black font-medium py-2 rounded-lg text-sm transition shadow-sm ${
-							sidebarOpen
-								? "w-full px-3"
-								: "w-10 h-10 p-0 mx-auto"
-						}`}
-						title="Agente IA"
-					>
-						<Sparkles size={16} className="flex-shrink-0" />
-						{sidebarOpen && <span>Agente IA</span>}
-					</Link>
-				</div>
-
-				{/* Links de Navegación */}
-				<div className="flex-1 py-4 px-2 space-y-1 overflow-y-auto">
-					{sidebarOpen && (
-						<div className="text-[10px] font-semibold text-gray-500 uppercase px-3 mb-2 tracking-wider">
-							General
-						</div>
-					)}
-					{navigationItems.map((item) => {
-						const Icon = item.icon;
-						const isActive = pathname === item.href;
-						return (
-							<Link
-								key={item.href}
-								href={item.href}
-								title={!sidebarOpen ? item.name : undefined}
-								className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${
-									sidebarOpen ? "" : "justify-center"
-								} ${
-									isActive
-										? "bg-[#27272a] text-emerald-400 border border-gray-700/50"
-										: "text-gray-400 hover:bg-[#1f1f23] hover:text-gray-200"
-								}`}
-							>
-								<Icon size={18} className="flex-shrink-0" />
-								{sidebarOpen && (
-									<span className="truncate whitespace-nowrap">
-										{item.name}
-									</span>
-								)}
-							</Link>
-						);
-					})}
-				</div>
-			</aside>
-
-			{/* Contenedor Principal (Sincronizado dinámicamente con pl-64 / pl-16) */}
+			{/* Contenedor Principal */}
 			<div
 				className={`flex-1 flex flex-col min-w-0 transition-all duration-300 ease-in-out ${
-					sidebarOpen ? "lg:pl-64" : "lg:pl-16"
+					desktopCollapsed ? "lg:pl-16" : "lg:pl-64"
 				}`}
 			>
 				{/* Navbar Superior */}
-				<header className="h-16 border-b border-gray-800 bg-[#141416]/80 backdrop-blur-md px-6 flex items-center justify-between sticky top-0 z-30">
-					<div className="flex items-center gap-4">
-						{/* Toggle para Móvil */}
+				<header className="h-16 border-b border-gray-800 bg-[#141416]/80 backdrop-blur-md px-4 sm:px-6 flex items-center justify-between sticky top-0 z-30">
+					<div className="flex items-center gap-3">
+						{/* Botón de Hamburguesa Móvil */}
 						<button
-							onClick={() => setSidebarOpen(!sidebarOpen)}
-							className="lg:hidden text-gray-400 hover:text-white"
+							onClick={() => setMobileOpen(true)}
+							className="lg:hidden text-gray-400 hover:text-white p-1.5 rounded-lg hover:bg-[#1f1f23] transition-colors"
+							aria-label="Abrir menú"
 						>
 							<Menu size={22} />
 						</button>
 
+						{/* Logo en Navbar para Móvil */}
+						<div className="flex flex-col whitespace-nowrap lg:hidden">
+							<span className="font-bold text-white text-base tracking-tight leading-none">
+								Agente
+								<span className="text-emerald-400 font-normal">
+									.finanzas
+								</span>
+							</span>
+							<span className="text-[9px] font-mono text-gray-400 tracking-widest uppercase mt-0.5">
+								AI ANALYTICS
+							</span>
+						</div>
+
 						{/* Toggle para Escritorio */}
 						<button
-							onClick={() => setSidebarOpen(!sidebarOpen)}
+							onClick={() =>
+								setDesktopCollapsed(!desktopCollapsed)
+							}
 							className="hidden lg:flex items-center text-gray-400 hover:text-white p-1.5 rounded-lg hover:bg-[#1f1f23] transition-colors"
 							title={
-								sidebarOpen ? "Colapsar menú" : "Expandir menú"
+								desktopCollapsed
+									? "Expandir menú"
+									: "Colapsar menú"
 							}
 						>
-							{sidebarOpen ? (
-								<PanelLeftClose size={20} />
-							) : (
+							{desktopCollapsed ? (
 								<PanelLeft size={20} />
+							) : (
+								<PanelLeftClose size={20} />
 							)}
 						</button>
 					</div>
 
 					{/* Elementos Derechos del Navbar */}
-					<div className="flex items-center gap-4">
+					<div className="flex items-center gap-3">
 						<button className="text-gray-400 hover:text-white relative p-1.5 rounded-lg hover:bg-[#1f1f23]">
 							<Bell size={18} />
 						</button>
@@ -265,7 +185,7 @@ export default function DashboardLayout({
 
 									<div className="py-1">
 										<Link
-											href="/dashboard/settings"
+											href="/settings"
 											onClick={() =>
 												setDropdownOpen(false)
 											}
@@ -278,7 +198,7 @@ export default function DashboardLayout({
 											<span>Perfil / Ajustes</span>
 										</Link>
 										<Link
-											href="/dashboard/settings"
+											href="/settings"
 											onClick={() =>
 												setDropdownOpen(false)
 											}
@@ -313,7 +233,7 @@ export default function DashboardLayout({
 				</header>
 
 				{/* Contenido Central Dinámico */}
-				<main className="flex-1 p-6 lg:p-10 bg-[#121214] overflow-y-auto">
+				<main className="flex-1 p-4 sm:p-6 lg:p-10 bg-[#121214] overflow-y-auto">
 					{children}
 				</main>
 			</div>

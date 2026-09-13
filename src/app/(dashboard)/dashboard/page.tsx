@@ -1,3 +1,4 @@
+// src/app/(dashboard)/dashboard/page.tsx
 import React from "react";
 import { prisma } from "@/lib/prisma";
 import { AccountType } from "@prisma/client";
@@ -111,8 +112,9 @@ export default async function DashboardOverviewPage() {
 					Módulos del Sistema
 				</h3>
 				<div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+					{/* Si moviste la ruta accounts a src/app/(dashboard)/accounts, actualiza el href a "/accounts" */}
 					<Link
-						href="/dashboard/accounts"
+						href="/accounts"
 						className="p-4 bg-[#1f1f23] hover:bg-[#27272a] border border-gray-800 rounded-lg transition group"
 					>
 						<div className="font-medium text-white group-hover:text-emerald-400 text-sm">
@@ -122,22 +124,29 @@ export default async function DashboardOverviewPage() {
 							Ver listado, agregar o eliminar tarjetas y saldos.
 						</div>
 					</Link>
-					<div className="p-4 bg-[#1f1f23] border border-gray-800 rounded-lg opacity-60 cursor-not-allowed">
-						<div className="font-medium text-white text-sm">
-							Transacciones (Próximamente)
+					<Link
+						href="/transactions"
+						className="p-4 bg-[#1f1f23] hover:bg-[#27272a] border border-gray-800 rounded-lg transition group"
+					>
+						<div className="font-medium text-white group-hover:text-emerald-400 text-sm">
+							Transacciones
 						</div>
 						<div className="text-xs text-gray-400 mt-1">
 							Registro de gastos e ingresos por categoría.
 						</div>
-					</div>
-					<div className="p-4 bg-[#1f1f23] border border-gray-800 rounded-lg opacity-60 cursor-not-allowed">
-						<div className="font-medium text-white text-sm">
-							Presupuestos y Cortes
+					</Link>
+					<Link
+						href="/ai-agent"
+						className="p-4 bg-[#1f1f23] hover:bg-[#27272a] border border-gray-800 rounded-lg transition group"
+					>
+						<div className="font-medium text-white group-hover:text-emerald-400 text-sm">
+							Agente IA
 						</div>
 						<div className="text-xs text-gray-400 mt-1">
-							Control de fechas de corte de tarjetas.
+							Consulta y registra movimientos mediante lenguaje
+							natural.
 						</div>
-					</div>
+					</Link>
 				</div>
 			</div>
 		</div>
